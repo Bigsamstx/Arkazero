@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArkaZero | Self-Repaying Loan Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Manrope', sans-serif; background-color: #0f172a; color: white; }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 24px; height: 24px; background: #38bdf8;
+            border-radius: 50%; cursor: pointer; border: 4px solid #0f172a;
+        }
+        .chart-container { position: relative; height: 200px; width: 100%; border-left: 2px solid #334155; border-bottom: 2px solid #334155; }
+        .chart-bar { position: absolute; bottom: 0; background: linear-gradient(to top, #38bdf8, #818cf8); width: 10%; transition: height 0.5s ease; border-radius: 4px 4px 0 0; }
+        .chart-line { position: absolute; left: 0; width: 100%; height: 2px; background: #ef4444; top: 10%; stroke-dasharray: 5,5; opacity: 0.5; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <div class="space-y-8">
+            <div>
+                <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-indigo-400">ArkaZero</h1>
+                <p class="text-slate-400 mt-2">Don't just borrow. Let the yield pay it back.</p>
+            </div>
+
+            <div class="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl space-y-6">
+                
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm font-semibold text-slate-300">Collateral (STX)</label>
+                        <span id="stxDisplay" class="font-mono text-sky-400">1000 STX</span>
+                    </div>
+                    <input type="range" min="100" max="10000" step="100" value="1000" class="w-full h-2 bg-slate-700 rounded-lg appearance-none slider-thumb" oninput="updateValues()" id="stxInput">
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm font-semibold text-slate-300">Loan to Value</label>
+                        <span id="ltvDisplay" class="font-mono text-indigo-400">25% (Safe)</span>
+                    </div>
+                    <input type="range" min="1" max="40" step="1" value="25" class="w-full h-2 bg-slate-700 rounded-lg appearance-none slider-thumb" oninput="updateValues()" id="ltvInput">
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm font-semibold text-slate-300">Farming APY</label>
+                        <span id="apyDisplay" class="font-mono text-green-400">20%</span>
+                    </div>
+                    <input type="range" min="5" max="100" step="1" value="20" class="w-full h-2 bg-slate-700 rounded-lg appearance-none slider-thumb" oninput="updateValues()" id="apyInput">
+                    <p class="text-xs text-slate-500 mt-2">Based on current DIKO/USDA Farm rates.</p>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-32 bg-sky-500/10 blur-3xl rounded-full pointer-events-none"></div>
+
+            <div class="relative z-10">
+                <h2 class="text-sm uppercase tracking-widest text-slate-500 font-bold mb-6">Time to Freedom</h2>
+                
+                <div class="flex items-baseline gap-2 mb-8">
+                    <span id="yearsDisplay" class="text-6xl font-extrabold text-white">--</span>
+                    <span class="text-xl text-slate-400">Years</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-8">
+                    <div class="bg-slate-800 p-4 rounded-xl">
+                        <p class="text-xs text-slate-400">You Borrow</p>
+                        <p class="text-xl font-bold text-white" id="debtDisplay">$0</p>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl">
+                        <p class="text-xs text-slate-400">Monthly Yield</p>
+                        <p class="text-xl font-bold text-green-400" id="yieldDisplay">$0</p>
+                    </div>
+                </div>
+
+                <div class="chart-container flex justify-between items-end px-2" id="chart">
+                    </div>
+                <div class="flex justify-between text-xs text-slate-500 mt-2">
+                    <span>Today</span>
+                    <span>50% Paid</span>
+                    <span>Debt Free</span>
+                </div>
+            </div>
+
+            <button class="mt-8 w-full bg-white text-slate-900 font-bold py-4 rounded-xl hover:bg-sky-50 transition-colors shadow-lg shadow-sky-900/20">
+                Start Strategy
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const STX_PRICE = 2.00; // Mock Oracle Price
+
+        function updateValues() {
+            // 1. Get Inputs
+            const stxAmount = parseFloat(document.getElementById('stxInput').value);
+            const ltv = parseFloat(document.getElementById('ltvInput').value);
+            const apy = parseFloat(document.getElementById('apyInput').value);
+
+            // 2. Calculate Financials
+            const collateralValue = stxAmount * STX_PRICE;
+            const debt = collateralValue * (ltv / 100);
+            
+            // Annual Yield = Debt (invested in farm) * APY
+            // Note: Assuming we put the borrowed USDA into the farm
+            const annualYield = debt * (apy / 100);
+            const monthlyYield = annualYield / 12;
+
+            // Time to pay off = Debt / Annual Yield
+            // Simplified (ignoring compounding for clarity of demo)
+            let yearsToFreedom = debt / annualYield;
+            if (!isFinite(yearsToFreedom)) yearsToFreedom = 0;
+
+            // 3. Update Text UI
+            document.getElementById('stxDisplay').innerText = `${stxAmount.toLocaleString()} STX`;
+            document.getElementById('ltvDisplay').innerText = `${ltv}%`;
+            document.getElementById('apyDisplay').innerText = `${apy}%`;
+            
+            document.getElementById('debtDisplay').innerText = `$${debt.toLocaleString(undefined, {maximumFractionDigits:0})}`;
+            document.getElementById('yieldDisplay').innerText = `+$${monthlyYield.toLocaleString(undefined, {maximumFractionDigits:2})}`;
+            document.getElementById('yearsDisplay').innerText = yearsToFreedom.toFixed(1);
+
+            // 4. Update Chart (Visualizing Debt Reduction)
+            const chart = document.getElementById('chart');
+            chart.innerHTML = ''; // Clear previous
+            
+            // Create 5 bars representing progress over time
+            for (let i = 0; i < 6; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'chart-bar';
+                bar.style.left = `${i * 18}%`;
+                
+                // Height represents Debt Remaining
+                // Start at 80% height, go down to 0%
+                const percentageRemaining = 1 - (i / 5); 
+                bar.style.height = `${percentageRemaining * 80}%`;
+                
+                // Color shift
+                if(i === 5) {
+                    bar.style.background = '#4ade80'; // Green at the end
+                    bar.style.height = '10px'; // Small bump to show "Free"
+                }
+
+                chart.appendChild(bar);
+            }
+        }
+
+        // Init
+        updateValues();
+    </script>
+</body>
+</html>
